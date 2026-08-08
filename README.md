@@ -20,4 +20,4 @@ Kompletna ścieżka operacji red team w środowiskach **macOS** — od dostępu 
 Materiał **wyłącznie** do celów edukacyjnych, autoryzowanych testów bezpieczeństwa i budowania detekcji. Użycie opisanych technik bez pisemnej zgody właściciela systemu jest przestępstwem (art. 267–269 KK).
 
 ---
-*Edycje siostrzane: [🐧 Linux](https://github.com/zi3lak/redteam-na-linuxie) · [🪟 Windows](https://github.com/zi3lak/redteam-na-windows)*
+*Cykl siostrzany: [🐧 Linux](https://github.com/zi3lak/redteam-na-linuxie) · [🪟 Windows](https://github.com/zi3lak/redteam-na-windows) · [💀 Ransomware](https://github.com/zi3lak/redteam-ransomware)*
