@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Red Team on macOS — an offensive and detection knowledge compendium</title>
+<meta name="description" content="The complete red team operation path in macOS environments: reconnaissance, privilege escalation, persistence, security bypasses, C2, detection.">
+<style>
+:root {
+  --bg: #0d1117;
+  --bg-alt: #161b22;
+  --bg-code: #1c2128;
+  --fg: #e6edf3;
+  --fg-dim: #9da7b3;
+  --accent: #e5484d;
+  --accent-dim: #b33a3e;
+  --border: #30363d;
+  --link: #ff6b70;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 70px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.7;
+}
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(13,17,23,.95);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 14px;
+}
+.topbar .logo { color: var(--accent); font-weight: 800; font-size: 18px; letter-spacing: .5px; white-space: nowrap; }
+.topbar nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; }
+.topbar nav a {
+  color: var(--fg-dim); text-decoration: none; font-size: 13px;
+  padding: 4px 10px; border-radius: 6px; white-space: nowrap;
+}
+.topbar nav a:hover { color: var(--fg); background: var(--bg-alt); }
+.topbar .lang-switch {
+  margin-left: auto; flex-shrink: 0;
+  color: var(--fg); text-decoration: none; font-size: 13px; font-weight: 600;
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.topbar .lang-switch:hover { background: var(--bg-alt); border-color: var(--accent-dim); }
+.hero {
+  max-width: 900px; margin: 0 auto; padding: 48px 24px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.hero .badge {
+  display: inline-block; background: var(--accent); color: #fff;
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; padding: 4px 12px; border-radius: 4px; margin-bottom: 16px;
+}
+.hero h1 { margin: 0 0 8px; font-size: 2.2rem; line-height: 1.2; }
+.hero p.sub { color: var(--fg-dim); margin: 0; }
+.disclaimer {
+  max-width: 900px; margin: 24px auto 0; padding: 0 24px;
+}
+.disclaimer .box {
+  border: 1px solid var(--accent-dim); border-left: 4px solid var(--accent);
+  background: rgba(229,72,77,.08); border-radius: 8px;
+  padding: 14px 18px; font-size: 14px; color: var(--fg-dim);
+}
+main { max-width: 900px; margin: 0 auto; padding: 24px 24px 80px; }
+h1 { display: none; } /* tytul w hero */
+h2 {
+  margin-top: 56px; padding-top: 12px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent-dim);
+  font-size: 1.6rem;
+}
+h3 { margin-top: 36px; color: var(--accent); font-size: 1.2rem; }
+h4 { margin-top: 24px; }
+a { color: var(--link); }
+img {
+  max-width: 100%; height: auto; display: block; margin: 20px auto;
+  border: 1px solid var(--border); border-radius: 8px; background: #fff;
+}
+table { border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 14px; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: var(--bg-alt); color: var(--accent); }
+tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+code {
+  background: var(--bg-code); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 6px;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace; font-size: .9em;
+}
+pre {
+  background: var(--bg-code); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px; overflow-x: auto;
+}
+pre code { background: none; border: none; padding: 0; }
+blockquote {
+  margin: 16px 0; padding: 4px 18px;
+  border-left: 4px solid var(--accent-dim);
+  background: var(--bg-alt); border-radius: 0 8px 8px 0;
+  color: var(--fg-dim);
+}
+sup { color: var(--accent); font-size: .75em; }
+hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+ul li, ol li { margin: 4px 0; }
+footer {
+  border-top: 1px solid var(--border);
+  padding: 24px; text-align: center;
+  color: var(--fg-dim); font-size: 13px;
+}
+@media (max-width: 700px) {
+  .hero h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.3rem; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="logo">RT//MACOS</span>
+  <nav>
+    <a href="#executive-summary">Executive summary</a>
+<a href="#legal-and-ethical-disclaimer">Legal and ethical disclaimer</a>
+<a href="#table-of-contents">Table of contents</a>
+<a href="#1-why-macos-is-a-separate-red-team-discipline">1. Why macOS is a separate red team discipline</a>
+<a href="#2-initial-access-gatekeeper-dmgpkg-and-the-clickfix-era">2. Initial access: Gatekeeper, DMG/pkg and the ClickFix era</a>
+<a href="#3-reconnaissance-and-enumeration-lotl-the-apple-way">3. Reconnaissance and enumeration: LOTL the Apple way</a>
+<a href="#4-privilege-escalation-from-tcc-to-the-xnu-kernel">4. Privilege escalation: from TCC to the XNU kernel</a>
+<a href="#5-persistence-seventeen-ways-to-survive-a-reboot">5. Persistence: seventeen ways to survive a reboot</a>
+<a href="#6-defense-evasion-gatekeeper-xprotect-and-dyld-magic">6. Defense evasion: Gatekeeper, XProtect and dyld magic</a>
+<a href="#7-credential-access-the-keychain-as-a-vault">7. Credential access: the Keychain as a vault</a>
+<a href="#8-lateral-movement-ssh-ard-and-mdm-abuse">8. Lateral movement: SSH, ARD and MDM abuse</a>
+<a href="#9-command-and-control-mythic-poseidon-sliver-mdm-as-c2">9. Command and Control: Mythic, Poseidon, Sliver, MDM-as-C2</a>
+<a href="#10-actions-on-objectives-from-stealers-to-targeted-operations">10. Actions on objectives: from stealers to targeted operations</a>
+<a href="#11-blue-team-counterpoint-telemetry-and-detections">11. Blue Team counterpoint: telemetry and detections</a>
+<a href="#12-threat-landscape-20242026">12. Threat landscape 2024–2026</a>
+<a href="#13-development-path-and-laboratory">13. Development path and laboratory</a>
+<a href="#14-conclusion">14. Conclusion</a>
+<a href="#references">References</a>
+  </nav>
+  <a class="lang-switch" href="index.html">PL</a>
+</header>
+<section class="hero">
+  <span class="badge">Compendium &middot; August 2026</span>
+  <h1>Red Team on macOS</h1>
+  <p class="sub">The complete offensive operation path on macOS: methodology, techniques, tools, C2 infrastructure, and the detection counterpoint — mapped to MITRE ATT&amp;CK.</p>
+</section>
+<div class="disclaimer">
+  <div class="box">
+    <strong>Disclaimer:</strong> this material is for educational purposes, authorized security testing, and detection engineering only. Using the described techniques on systems without the owner's written consent is a crime in most jurisdictions.
+  </div>
+</div>
+<main>
+<h1 id="red-team-on-macos--an-offensive-and-detection-knowledge-compendium">Red Team on macOS — an offensive and detection knowledge compendium</h1>
+<p><strong>Document type:</strong> technical compendium (deep research) · <strong>Language:</strong> English · <strong>Scope:</strong> macOS 13 Ventura – macOS 26 Tahoe (Apple Silicon and Intel) · <strong>Perspective:</strong> Red Team with a Blue Team counterpoint · <strong>Date:</strong> August 2026</p>
+<blockquote>
+<p><strong>Sister edition:</strong> this document is the third part of the series — following "Red Team on Linux" and "Red Team on Windows". It keeps an identical architecture: MITRE ATT&amp;CK mapping, step-by-step scenarios, comparison tables, and detection sections for defenders.</p>
+</blockquote>
+<hr />
+<h2 id="executive-summary">Executive summary</h2>
+<p>macOS has ceased to be a "safe enclave" and has become a fully mature battleground: according to the Jamf Security 360 report (2026), the Mac computer market grew by 16.4%, and <strong>44% of Mac computers encountered malicious network traffic in 2025</strong> <sup>[304]</sup>. The economics of the threat have changed fundamentally: stealer-type malware (Atomic macOS Stealer, Poseidon, Odyssey) is sold in a MaaS model for USD 1,000–3,000 per month, and Poseidon alone accounted for roughly <strong>70% of all active macOS infections</strong> in mid-2025 <sup>[255]</sup> <sup>[308]</sup>. The number of new macOS malware families grew by around <strong>400%</strong> from 2023 to 2024, while the share of trojans among detections jumped from 16.6% to 50.3% within a single year <sup>[253]</sup> <sup>[304]</sup>.</p>
+<p>Three strategic conclusions for offensive and defensive teams:</p>
+<ol>
+<li><strong>The perimeter is dead — social engineering lives on.</strong> Real campaigns do not strike XNU from the outside; they pass through the user: fake browser updates, malvertising, and the ClickFix tactic, in which the victim pastes a one-line <code>curl | zsh</code> command into Terminal themselves — this method is used today both by cybercriminals (AMOS, Odyssey) and by North Korean state operators (BeaverTail/InvisibleFerret) <sup>[280]</sup> <sup>[284]</sup>.</li>
+<li><strong>TCC, not the kernel, is the center of gravity.</strong> The most interesting macOS operations are not kernel exploits but chains of Transparency, Consent and Control bypasses: from the Accessibility permission, through EndpointSecurityClient, to Full Disk Access — and onward to the Keychain. In macOS 27, Apple even plans to extend TCC with new services (SysAdminFiles, NFSHomeDirectory) and replace some old permissions with new categories <sup>[251]</sup> <sup>[240]</sup>.</li>
+<li><strong>Detection exists and is undervalued.</strong> The Endpoint Security Framework emits over a hundred event types (exec, mmap, fork, signal, and since macOS 26.4 also low-level socket events), XProtect Remediator operates as an active behavioral scanner, and the community provides ready-made rules (Elastic, SigmaHQ, coreSigma) — the problem is not a lack of telemetry but a lack of consumers for it <sup>[273]</sup> <sup>[270]</sup> <sup>[305]</sup> <sup>[269]</sup>.</li>
+</ol>
+<p>The most important techniques covered in this compendium, in attack-chain order: bypassing Gatekeeper quarantine (including the "live" vulnerability related to downloading via Finder/SMB), DMG/pkg engineering and ClickFix, enumeration via JXA/osascript, escalation via TCC and SUID, persistence in LaunchAgents/Daemons (and the exotic ones: emond, periodic, login hooks, overrides.plist), dylib injection and hijacking, Keychain exfiltration, lateral movement via SSH/ARD/Remote Apple Events, and MDM abuse (Jamf as C2), concluding with C2 in Mythic (Apfell, Poseidon) and Sliver/MacC2 <sup>[226]</sup> <sup>[239]</sup> <sup>[258]</sup> <sup>[250]</sup> <sup>[294]</sup> <sup>[267]</sup> <sup>[78]</sup>.</p>
+<hr />
+<h2 id="legal-and-ethical-disclaimer">Legal and ethical disclaimer</h2>
+<p><strong>For use exclusively in authorized security testing.</strong> All techniques described in this document serve education, the work of red teams operating under a formal mandate, defender training, and detection engineering. Using them against systems without the explicit, written consent of the owner is a crime — in Poland, among others, under Articles 267–269b of the Penal Code (unauthorized access, wiretapping, data destruction, attack tooling), and in the USA under the Computer Fraud and Abuse Act. Procedures characteristic of macOS — bypassing Gatekeeper and TCC, Keychain dumping, MDM abuse — carry a particularly high "legal density", because some of them (e.g., circumventing content-protection mechanisms and technical safeguards) may also violate copyright-protection regulations. The authors and distributors of this material accept no liability for misuse. <strong>Rule: no written consent = no action.</strong></p>
+<hr />
+<h2 id="table-of-contents">Table of contents</h2>
+<ol>
+<li><a href="#1-why-macos-is-a-separate-red-team-discipline">Why macOS is a separate red team discipline</a></li>
+<li><a href="#2-initial-access-gatekeeper-dmgpkg-and-the-clickfix-era">Initial access: Gatekeeper, DMG/pkg and the ClickFix era</a></li>
+<li><a href="#3-reconnaissance-and-enumeration-lotl-the-apple-way">Reconnaissance and enumeration: LOTL the Apple way</a></li>
+<li><a href="#4-privilege-escalation-from-tcc-to-the-xnu-kernel">Privilege escalation: from TCC to the XNU kernel</a></li>
+<li><a href="#5-persistence-seventeen-ways-to-survive-a-reboot">Persistence: seventeen ways to survive a reboot</a></li>
+<li><a href="#6-defense-evasion-gatekeeper-xprotect-and-dyld-magic">Defense evasion: Gatekeeper, XProtect and dyld magic</a></li>
+<li><a href="#7-credential-access-the-keychain-as-a-vault">Credential access: the Keychain as a vault</a></li>
+<li><a href="#8-lateral-movement-ssh-ard-and-mdm-abuse">Lateral movement: SSH, ARD and MDM abuse</a></li>
+<li><a href="#9-command-and-control-mythic-poseidon-sliver-mdm-as-c2">Command and Control: Mythic, Poseidon, Sliver, MDM-as-C2</a></li>
+<li><a href="#10-actions-on-objectives-from-stealers-to-targeted-operations">Actions on objectives: from stealers to targeted operations</a></li>
+<li><a href="#11-blue-team-counterpoint-telemetry-and-detections">Blue Team counterpoint: telemetry and detections</a></li>
+<li><a href="#12-threat-landscape-20242026">Threat landscape 2024–2026</a></li>
+<li><a href="#13-development-path-and-laboratory">Development path and laboratory</a></li>
+<li><a href="#14-conclusion">Conclusion</a></li>
+</ol>
+<hr />
+<h2 id="1-why-macos-is-a-separate-red-team-discipline">1. Why macOS is a separate red team discipline</h2>
+<p>A red teamer accustomed to Windows or Linux loses nearly their entire arsenal of intuitions when sitting down at a Mac. There is no Registry; instead there is a web of plists, defaults, and TCC sqlite databases. There is no ETW — there is the Endpoint Security Framework and the Unified Log. Instead of <code>CreateRemoteThread</code> there is <code>DYLD_INSERT_LIBRARIES</code> and task ports. Instead of <code>rundll32</code> — <code>osascript</code>. The operating system itself is a hybrid: the XNU kernel (Mach + BSD), the <code>launchd</code> launch manager (init, cron, inetd, and watcher in one), plus a stack of Apple's own security mechanisms: SIP (System Integrity Protection) protecting system paths even from root, Gatekeeper with notarization, the App Store application sandbox, and the aforementioned TCC.</p>
+<p>A typical macOS attack chain in 2025–2026 looks as follows:</p>
+<p><img alt="Typical macOS attack chain" src="assets-rt-macos/mfig1-lancuch-macos.png" /></p>
+<p><em>Fig. 1. macOS attack chain — from delivery (DMG, pkg, ClickFix) to C2, with marked points where Apple's mechanisms operate (sources: <sup>[226]</sup> <sup>[236]</sup> <sup>[260]</sup>).</em></p>
+<p>Key doctrinal differences compared to other platforms:</p>
+<p><strong>1. The user is the perimeter.</strong> Because the external attack surface of a Mac is small (by default no listening services beyond mDNS/Bonjour), nearly all ecosystem crime begins with delivering something to the user: a DMG image with a fake "installer", a pkg package, an archive from malvertising, or a command to paste. Poseidon Stealer campaigns were distributed, among other ways, through malvertising impersonating Arc browser downloads <sup>[308]</sup> <sup>[252]</sup>.</p>
+<p><strong>2. TCC is "UAC on steroids" — and its bypasses are hard currency.</strong> Access to Documents, Desktop, camera, microphone, screen recording, and above all Full Disk Access — everything passes through the TCC.db databases (<code>~/Library/Application Support/com.apple.TCC/TCC.db</code> and <code>/Library/Application Support/com.apple.TCC/TCC.db</code>). Analyses such as "A deep dive into macOS TCC" (csandlin.io, January 2026) show that permissions can be deftly transmuted into one another: e.g., <code>kTCCServiceSystemPolicySysAdminFiles</code> grants full access to the user's NFSHomeDirectory, and being an EndpointSecurityClient allows reading files of arbitrary processes <sup>[251]</sup>. Apple responds with escalation: in the announced macOS 27, directories under <code>/Library</code> currently covered by FDA are to require separate, granular permissions, and some old categories (including Accessibility as a gateway to FDA) will be replaced with new ones <sup>[240]</sup>.</p>
+<p><strong>3. "Security through unpopularity" has expired.</strong> A ~400% increase in the number of malware families (2023→2024) and the fact that 44% of Macs in the studied Jamf population encountered malicious traffic in 2025 end the era in which macOS was a second-tier target <sup>[253]</sup> <sup>[304]</sup>. North Korea treats the Mac as a first-class target: the Contagious Interview campaigns, evolving since 2023, use native macOS implants (BeaverTail as a Qt application, InvisibleFerret in Python) and reach developers through fake recruitment — including a ClickFix variant involving pasting a command <sup>[279]</sup> <sup>[284]</sup>.</p>
+<p><strong>4. Fleet management (MDM) is simultaneously the biggest vector and the biggest blind spot.</strong> In corporate environments, Macs are managed by Jamf, Kandji, or Intune. Whoever controls the MDM controls the fleet — they can push configuration profiles (which are themselves a persistence mechanism), pkg packages, and scripts running with root context. Industry reports and EDR comparisons point to abuse of remote administration tools and MDM as a still poorly monitored vector — in practice this path is often excluded from suspicion by security teams <sup>[311]</sup> <sup>[294]</sup>.</p>
+<p>For readers coming from the earlier parts of the series: many proper nouns will repeat (ATT&amp;CK, SIGMA, osquery, MITRE), but almost no concrete technique transfers 1:1. This is precisely what makes macOS a separate specialization — confirmed by the fact that SpecterOps maintains a dedicated course, "Adversary Tactics: Mac Tradecraft", and the Objective by the Sea conference exists exclusively around Apple security <sup>[286]</sup> <sup>[267]</sup>.</p>
+<hr />
+<h2 id="2-initial-access-gatekeeper-dmgpkg-and-the-clickfix-era">2. Initial access: Gatekeeper, DMG/pkg and the ClickFix era</h2>
+<h3 id="21-anatomy-of-the-first-crossing">2.1 Anatomy of the first crossing</h3>
+<p>Gatekeeper enforces three layers: the quarantine attribute (<code>com.apple.quarantine</code>), verification of Apple's signature and notarization, and — since Sequoia — a forced user decision via System Settings. The red team must therefore answer the question: <strong>how to ensure the payload never gets the quarantine label at all, or that the user removes it themselves?</strong></p>
+<p>Three realistic classes of answers:</p>
+<p><strong>A. Quarantine gaps in download mechanisms.</strong> The <code>com.apple.quarantine</code> attribute is set by the process that <em>writes</em> the file — not the one that runs it. Historically, Finder set quarantine for files downloaded from SMB via "Connect to Server", but analyses have shown gaps in this chain: files copied from an SMB share could land on disk without the attribute, opening the way to launching an unnotarized application without a prompt <sup>[226]</sup>. A fresher example is <strong>CVE-2025-46291</strong> — a quarantine-handling bug patched in 2025, showing that the "download → tag → verify" stack itself continues to generate Gatekeeper-bypass-class vulnerabilities <sup>[227]</sup>.</p>
+<p><strong>B. Interface change ≠ model change.</strong> In macOS 15 Sequoia, Apple removed the famous "Control-click → Open" as a Gatekeeper bypass method for unnotarized software — the user must now go through System Settings → Privacy &amp; Security <sup>[232]</sup>. This raised the cost of the "convince the user to double-click" class, but did not close it: campaigns simply migrated to multi-step instructions (screenshots in the DMG guiding the user by the hand) and to ClickFix.</p>
+<p><strong>C. ClickFix: the user as downloader and loader.</strong> Instead of fighting Gatekeeper, attackers make the victim do its work: a fake page ("fix your browser problem", "verify the CAPTCHA") instructs them to paste a one-liner of the form <code>curl -s ... | zsh</code> into Terminal. ClickFix campaigns distributing the AMOS and Odyssey stealers were documented at scale in 2025 <sup>[252]</sup> <sup>[279]</sup>; Palo Alto Unit 42 attributed an analogous tactic to DPRK operators <sup>[284]</sup>, and the GitLab security team described North Korean macOS malware delivered precisely by this method <sup>[280]</sup>. From the defender's point of view this is a nightmare: execution originates from a Terminal launched by a trusted user, so Gatekeeper, quarantine, and notarization are <strong>completely bypassed</strong> at this stage — the only real line of defense is detection of the command itself (Unified Log, ESF <code>exec</code>, rules on Terminal→curl→interpreter parentage).</p>
+<h3 id="22-traditional-carriers-dmg-pkg-zip">2.2 Traditional carriers: DMG, pkg, ZIP</h3>
+<ul>
+<li><strong>DMG with "drag to Applications" content</strong> — the AMOS/Poseidon classic. The image contains an application icon and an alias of the Applications folder; newer versions add instructions for circumventing Sequoia.</li>
+<li><strong>pkg packages</strong> — the key advantage: <strong>preinstall/postinstall scripts execute as root</strong> during installation. Malicious pkg packages with postinstall scripts were documented in Poseidon campaigns <sup>[308]</sup> <sup>[252]</sup>. For the red team, pkg is simultaneously a vector and a privesc/persistence mechanism in one.</li>
+<li><strong>Shlayer-style script bundles</strong> — an application bundle whose "binary" is a shell script; historically one of the most effective tricks for deceiving user expectations and simpler engines <sup>[231]</sup>.</li>
+<li><strong>Malvertising and SEO poisoning</strong> — sponsored results for "Arc browser download", "Notion for Mac", etc., leading to site clones with malicious installers <sup>[308]</sup> <sup>[252]</sup>.</li>
+</ul>
+<h3 id="23-red-team-scenario-summary">2.3 Red team scenario (summary)</h3>
+<ol>
+<li>Fleet OSINT: macOS versions, MDM, EDR (see chap. 3).</li>
+<li>Carrier preparation: an ad-hoc-signed DMG with a JXA payload (Apfell) <em>or</em> a ClickFix campaign with a domain cloning a real tool used in the organization.</li>
+<li>Delivery: spear-phishing with a link, not an attachment (mail gateways rarely analyze DMGs).</li>
+<li>Execution: osascript/JXA in memory → staging to a full agent.</li>
+<li>Blue team checkpoint: correlating ESF <code>exec</code> (Terminal/zsh → curl) with writes to <code>~/Library/LaunchAgents</code>.</li>
+</ol>
+<hr />
+<h2 id="3-reconnaissance-and-enumeration-lotl-the-apple-way">3. Reconnaissance and enumeration: LOTL the Apple way</h2>
+<p>After the first execution, the operator needs answers to four questions: <em>where am I</em> (host, user, domain/MDM), <em>what can I do</em> (TCC, sudo), <em>who is watching</em> (EDR/ESF), <em>where next</em> (network, accounts, keys). macOS has a native tool for each of these — the entire enumeration can be done without uploading binaries.</p>
+<h3 id="31-map-of-native-tools-living-off-the-orchard">3.1 Map of native tools (living off the orchard)</h3>
+<table>
+<thead>
+<tr>
+<th>Enumeration goal</th>
+<th>Native tool / API</th>
+<th>Notes for the red team</th>
+<th>Detection (blue team)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Host, OS, hardware</td>
+<td><code>system_profiler SPSoftwareDataType SPNetworkDataType</code>, <code>sw_vers</code>, <code>uname -a</code></td>
+<td>Very "loud" in logs, but also common among admins</td>
+<td>rule on frequent <code>system_profiler</code> from an unusual parent</td>
+</tr>
+<tr>
+<td>Users and groups</td>
+<td><code>id</code>, <code>dscl . list /Users</code>, <code>dscacheutil -q group</code></td>
+<td><code>dscl</code> is the equivalent of <code>net user</code></td>
+<td><code>dscl</code> queries outside an admin context</td>
+</tr>
+<tr>
+<td>TCC permissions</td>
+<td>read <code>TCC.db</code> (requires FDA) or an empirical test (e.g., attempt to read <code>~/Documents</code>)</td>
+<td>a "TCC probe" leaves traces in the sandbox</td>
+<td>read of TCC.db by an unusual process</td>
+</tr>
+<tr>
+<td>Sudo</td>
+<td><code>sudo -n -l</code></td>
+<td>safe check without a password</td>
+<td>sudo event in the log</td>
+</tr>
+<tr>
+<td>Processes/EDR</td>
+<td><code>ps aux</code>, <code>launchctl list</code>, <code>es_event</code> (API), <code>log show</code></td>
+<td>look for: Jamf, Kandji, CrowdStrike, SentinelOne, Microsoft Defender, Santa</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Network</td>
+<td><code>arp -a</code>, <code>netstat -anv</code>, <code>lsof -i</code>, <code>scutil --dns</code></td>
+<td>topology and neighbors for lateral movement</td>
+<td><code>lsof -i</code> from a payload</td>
+</tr>
+<tr>
+<td>Keychain (metadata)</td>
+<td><code>security list-keychains</code>, <code>security find-generic-password -l ...</code></td>
+<td>listing without a dump</td>
+<td><code>security</code> invocations from a C2 agent</td>
+</tr>
+<tr>
+<td>Apple Events / automation</td>
+<td><code>osascript -e 'tell application "Finder" to ...'</code></td>
+<td>also for internal phishing (TCC prompt)</td>
+<td>ESF + TCC event on AED</td>
+</tr>
+</tbody>
+</table>
+<p>The canonical "post-exploitation checklist" toolkit for macOS is <strong>SwiftBelt</strong> by Cedric Owens — a bash/python script that collects, in a single run, users, shell histories, SSH content, installed applications, network configuration, and browser data, among other things <sup>[289]</sup>. In the framework role: Apfell and Poseidon modules (Mythic) cover most of these steps with agent commands.</p>
+<h3 id="32-jxaosascript-as-an-enumeration-language">3.2 JXA/osascript as an enumeration language</h3>
+<p>JavaScript for Automation (JXA) is for macOS what PowerShell is for Windows — an interpreter with full access to the system API (via the Objective-C bridge), run natively and without additional dependencies. Mythic/Apfell built an entire agent on it: enumeration, command execution, download/upload — everything in the memory of the osascript process <sup>[267]</sup> <sup>[268]</sup>. The Mythic documentation also describes how JXA cooperates with the ObjC bridge for native API calls (e.g., <code>$.NSFileManager</code>), which makes it possible to read files, list directories, and execute binaries without forking a shell <sup>[268]</sup>.</p>
+<p>Defensive implication: detection cannot rely on binary signatures, only on <strong>process parentage and arguments</strong> — e.g., rules catching <code>osascript -l JavaScript -e</code> and <code>osascript</code> with a parent other than Finder/Terminal/MDM <sup>[269]</sup>.</p>
+<h3 id="33-what-to-check-in-an-mdm-managed-environment">3.3 What to check in an MDM-managed environment</h3>
+<p>In a corporation, the first question is not "how do I get root" but "who already has it": the MDM agent (Jamf, Kandji) runs with root privileges and regularly executes scripts. Enumeration includes: <code>/var/log/jamf.log</code>, <code>profiles status -type enrollment</code>, MDM agent configuration files, and above all <strong>obtaining MDM secrets</strong> (see chap. 8) — because that is the shortest path to the fleet <sup>[294]</sup>.</p>
+<hr />
+<h2 id="4-privilege-escalation-from-tcc-to-the-xnu-kernel">4. Privilege escalation: from TCC to the XNU kernel</h2>
+<p>On macOS, privesc has two floors: the <em>POSIX permissions floor</em> (user → root) and the <em>Apple permissions floor</em> (TCC: Accessibility → Screen Recording → EndpointSecurityClient → FDA → iCloud data). In operational practice, the Apple floor is more valuable — FDA opens the Keychain and the data of all applications even without root.</p>
+<h3 id="41-the-posix-floor">4.1 The POSIX floor</h3>
+<p>Classic vectors carry over from Linux almost unchanged: sudo misconfiguration (<code>sudo -l</code>, NOPASSWD rules), SUID/SGID files (though SIP limits their number), writable files executed by launchd as root, and the installer environment (pkg with postinstall). The "100 Days of Red Team" series lists sudo and SUID as first-tier macOS privesc vectors <sup>[237]</sup>. A Mac-specific note: the <code>admin</code> group has broad capabilities (including writes to <code>/Applications</code>), and many developer tools install helpers with elevated privileges.</p>
+<h3 id="42-the-tcc-floor-permission-chains">4.2 The TCC floor: permission chains</h3>
+<p>The most interesting path is the <em>transmutation of TCC permissions</em>:</p>
+<ol>
+<li><strong>Accessibility (kTCCServiceAccessibility)</strong> — allows synthesizing HID events, i.e.... clicking through TCC dialogs on behalf of the user. Apple has restricted this, but historically it was the standard bridge to FDA <sup>[243]</sup>.</li>
+<li><strong>EndpointSecurityClient</strong> — a process with this permission can read the files of other processes, which csandlin.io identifies as a realistic escalation path all the way to FDA <sup>[251]</sup>.</li>
+<li><strong>SysAdminFiles / NFSHomeDirectory</strong> — the direction Apple is taking in macOS 27: granular permissions replacing monolithic FDA <sup>[240]</sup> <sup>[251]</sup>.</li>
+<li><strong>Bugs in TCC itself</strong> — CVE-2023-40424 showed a TCC bypass via process-environment manipulation; the XCSSET malware combined TCC bypasses with launchd persistence and browser-data theft <sup>[243]</sup> <sup>[246]</sup>.</li>
+</ol>
+<h3 id="43-sandbox-escape-and-the-kernel">4.3 Sandbox escape and the kernel</h3>
+<p>When a real root/SIP bypass is needed, the CVE scene is active:</p>
+<table>
+<thead>
+<tr>
+<th>Vulnerability</th>
+<th>Year</th>
+<th>Class</th>
+<th>Operational significance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CVE-2025-24277 (osanalyticshelperd)</td>
+<td>2025</td>
+<td>sandbox escape via XPC</td>
+<td>escaping the sandbox into a system-service context <sup>[297]</sup></td>
+</tr>
+<tr>
+<td>CVE-2025-31191 (SSB/keychain-ACL)</td>
+<td>2025</td>
+<td>Security-Scoped Bookmarks</td>
+<td>reading keychain ACLs from outside the sandbox — analyzed by Microsoft and independent researchers <sup>[300]</sup> <sup>[298]</sup> <sup>[301]</sup> <sup>[302]</sup></td>
+</tr>
+<tr>
+<td>CVE-2025-43330</td>
+<td>2025</td>
+<td>system component (ZDI-25-305)</td>
+<td>privesc described in the ZDI advisory <sup>[293]</sup> <sup>[303]</sup></td>
+</tr>
+<tr>
+<td>CVE-2026-20658</td>
+<td>2026</td>
+<td>kernel</td>
+<td>escalation in the XNU kernel <sup>[296]</sup></td>
+</tr>
+<tr>
+<td>CVE-2026-28915</td>
+<td>2026</td>
+<td>kernel locking</td>
+<td>race condition → privesc (ZDI) <sup>[295]</sup></td>
+</tr>
+</tbody>
+</table>
+<p>Scale context: the <strong>macOS Tahoe 26.6 update patched over 100 CVEs</strong> at once — the XNU attack surface remains broad, and Apple maintains a monthly patching cadence <sup>[292]</sup>. For the red team there are two conclusions: (1) a kernel exploit is a last-resort option (it destabilizes the host, panic risk), (2) TCC/XPC chains are far cheaper and do not require writing kernel memory.</p>
+<h3 id="44-scenario-from-user-to-fda-without-the-kernel">4.4 Scenario: from user to FDA without the kernel</h3>
+<ol>
+<li>A JXA payload checks <code>sudo -n -l</code> and EDR presence.</li>
+<li>If there is no FDA: TCC-prompt engineering — osascript asks for Accessibility "on behalf of" a legitimate application (e.g., a fake browser helper), and from there synthetic clicks accept further permissions <sup>[243]</sup>.</li>
+<li>Alternative: injection into a process that already has FDA (see chap. 6) — inheriting the TCC context from the parent.</li>
+<li>Verification: reading <code>~/Library/Application Support/com.apple.TCC/TCC.db</code> and attempting a Keychain dump (chap. 7).</li>
+</ol>
+<hr />
+<h2 id="5-persistence-seventeen-ways-to-survive-a-reboot">5. Persistence: seventeen ways to survive a reboot</h2>
+<p><code>launchd</code> is the heart of persistence on macOS, but not the only heart. Below is the full taxonomy, from canonical to exotic.</p>
+<h3 id="51-the-canon-launchagents-and-launchdaemons">5.1 The canon: LaunchAgents and LaunchDaemons</h3>
+<ul>
+<li><strong>LaunchAgents</strong> (<code>~/Library/LaunchAgents</code>, <code>/Library/LaunchAgents</code>) — run in the user's context at login. A plist file with the keys <code>Label</code>, <code>ProgramArguments</code>, <code>RunAtLoad</code>, optionally <code>KeepAlive</code> (auto-restart). The standard of APTs and stealers <sup>[239]</sup>.</li>
+<li><strong>LaunchDaemons</strong> (<code>/Library/LaunchDaemons</code>) — root context, start at boot. Requires write permissions. Elastic maintains dedicated T1543.001/T1543.004 rules for the creation and modification of these plists <sup>[245]</sup>.</li>
+</ul>
+<h3 id="52-beyond-the-canon-exotica-the-blue-team-rarely-reviews">5.2 Beyond the canon: exotica the blue team rarely reviews</h3>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Location / trigger</th>
+<th>Context</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Login Items (SMLoginItem/Shared File List)</td>
+<td>Settings → Login</td>
+<td>user</td>
+<td>visible in the GUI — low stealth</td>
+</tr>
+<tr>
+<td>emond (Event Monitor)</td>
+<td><code>/etc/emond.d/rules/*.plist</code></td>
+<td>root</td>
+<td>removed in newer macOS versions; a classic of older campaigns <sup>[239]</sup></td>
+</tr>
+<tr>
+<td>periodic</td>
+<td><code>/etc/periodic/{daily,weekly,monthly}</code></td>
+<td>root</td>
+<td>scripts run cyclically <sup>[239]</sup></td>
+</tr>
+<tr>
+<td>cron / at</td>
+<td><code>crontab</code>, <code>atrun</code> (disabled by default — must be activated)</td>
+<td>user/root</td>
+<td>activating <code>atrun</code> is itself an artifact <sup>[239]</sup></td>
+</tr>
+<tr>
+<td>Login/logout hooks</td>
+<td><code>defaults write com.apple.loginwindow LoginHook</code></td>
+<td>root</td>
+<td>an old mechanism, still working <sup>[239]</sup></td>
+</tr>
+<tr>
+<td>overrides.plist (launchd)</td>
+<td><code>/var/db/launchd.db/com.apple.launchd/overrides.plist</code></td>
+<td>root</td>
+<td>toggling <code>Disabled</code> for existing services — persistence by <em>enabling</em> a system daemon <sup>[239]</sup></td>
+</tr>
+<tr>
+<td>Folder Actions</td>
+<td>scripts attached to folders</td>
+<td>user</td>
+<td>triggered by an FS event</td>
+</tr>
+<tr>
+<td>Dylib proxying / hijack in an existing application</td>
+<td>bundle of a legitimate app</td>
+<td>user</td>
+<td>starts together with the carrier victim (chap. 6)</td>
+</tr>
+<tr>
+<td>Configuration profiles (MDM)</td>
+<td><code>profiles install</code></td>
+<td>system</td>
+<td>"infrastructural" persistence — a policy pushed as if by MDM <sup>[294]</sup></td>
+</tr>
+<tr>
+<td>Dock/startup UI applications</td>
+<td>manipulation of Dock plists</td>
+<td>user</td>
+<td>rare, loud</td>
+</tr>
+</tbody>
+</table>
+<p>Key operational insight: <strong>persistence should be matched to the host's MDM control</strong>. On a Jamf-managed machine, the stealthiest option is not a LaunchAgent but embedding oneself in MDM policies — because everything else is "healed" by Jamf during compliance checks <sup>[294]</sup>.</p>
+<h3 id="53-persistence-hygiene-for-the-red-team">5.3 Persistence hygiene for the red team</h3>
+<ul>
+<li>One primary + one fallback (e.g., LaunchAgent + Folder Action on Documents).</li>
+<li>Plist names masquerading as Apple (<code>com.apple.Safari.Support.plist</code> in user-space is an artifact known from campaigns — better to use your own, neutral name fitting the environment).</li>
+<li><code>KeepAlive: SuccessfulExit: false</code> instead of <code>true</code> — the agent should not resurrect after a kill -9 in an obvious way.</li>
+<li>Blue team: KnockKnock (Objective-See) scans exactly these categories; Elastic has rules for launchd <sup>[281]</sup> <sup>[245]</sup>.</li>
+</ul>
+<hr />
+<h2 id="6-defense-evasion-gatekeeper-xprotect-and-dyld-magic">6. Defense evasion: Gatekeeper, XProtect and dyld magic</h2>
+<h3 id="61-apples-defense-in-depth-through-an-attackers-eyes">6.1 Apple's defense in depth, through an attacker's eyes</h3>
+<p>Layers to defeat: (1) quarantine/Gatekeeper at delivery, (2) <strong>XProtect</strong> — the signature scanner at write/launch, (3) <strong>XProtect Remediator (XPR)</strong> — periodic behavioral scans with malware-removal capability, (4) <strong>XProtect Behavior Service</strong> — runtime behavior detection, (5) SIP and dyld restrictions for protected processes, (6) EDR on ESF <sup>[305]</sup> <sup>[307]</sup> <sup>[273]</sup>.</p>
+<p><img alt="Timeline of macOS security bypasses" src="assets-rt-macos/mfig2-obejscia.png" /></p>
+<p><em>Fig. 2. macOS security bypasses 2019–2026 on a timeline — gray points mark patched vulnerabilities, red ones techniques still viable (including the quarantine gap when downloading via Finder/SMB). Sources: <sup>[227]</sup> <sup>[295]</sup> <sup>[296]</sup> <sup>[297]</sup> <sup>[300]</sup>.</em></p>
+<h3 id="62-bypassing-xprotect-the-general-principle">6.2 Bypassing XProtect: the general principle</h3>
+<p>XProtect is strong against <strong>known signatures</strong> and weak against <strong>polymorphism and interpreted payloads</strong>. Hence three evasion families:</p>
+<ul>
+<li><strong>Interpreted payloads</strong> (JXA/osascript, Python, shell) instead of compiled Mach-O — Apfell runs in osascript memory, Poseidon has a <code>jxa</code> command for in-memory execution <sup>[267]</sup> <sup>[84]</sup>.</li>
+<li><strong>File evasion</strong>: staging in <code>~/Library/Caches</code>, random names and strings; minimizing writes (ESF sees <code>mmap</code> anyway, but there are fewer artifacts for XProtect).</li>
+<li><strong>Quarantine-off</strong>: delivery via channels without the attribute (SMB/Finder gap, archives through non-tagging applications, ClickFix) <sup>[226]</sup> <sup>[279]</sup>.</li>
+</ul>
+<h3 id="63-dyld_insert_libraries-why-ld_preload-for-mac-barely-works">6.3 DYLD_INSERT_LIBRARIES: why "LD_PRELOAD for Mac" barely works</h3>
+<p>The <code>DYLD_INSERT_LIBRARIES</code> variable is strictly restricted: it is ignored for setuid/setgid binaries, for binaries with a <code>__RESTRICT/__restrict</code> segment, and for processes with the hardened runtime lacking the appropriate entitlement (<code>com.apple.security.cs.allow-dyld-environment-variables</code>) or carrying the CS_RESTRICT flag <sup>[254]</sup> <sup>[261]</sup>. Practical consequence: env-based injection works mainly on <strong>your own applications</strong> or applications signed without the hardened runtime. Elastic has a ready-made EQL rule for <code>DYLD_INSERT_LIBRARIES</code> in process environment variables <sup>[256]</sup>.</p>
+<h3 id="64-dylib-hijacking-the-quieter-sister-of-injection">6.4 Dylib hijacking: the quieter sister of injection</h3>
+<p>Instead of pushing a library in, <strong>you replace the one a legitimate application is looking for</strong>:</p>
+<ul>
+<li><strong>rpath hijack</strong> — dyld searches the <code>@rpath</code> list in order; if the first directory is writable and the library is missing from it, the attacker inserts their own <sup>[258]</sup> <sup>[265]</sup>.</li>
+<li><strong>weak dylib hijack</strong> — a library marked <code>LC_LOAD_WEAK_DYLIB</code> whose file does not exist: dyld will tolerate its absence, but if the file <em>appears</em> in the path, it will be loaded <sup>[258]</sup>.</li>
+<li><strong>Dylib proxying</strong> — a malicious library bearing the original's name, which re-exports symbols to the real (renamed) one — transparent to the application, loaded at every launch <sup>[261]</sup>.</li>
+<li>A fresh CVE: <strong>CVE-2023-42920</strong> — a dylib hijack in FileMaker, showing that this class still generates vulnerabilities in mainstream software <sup>[262]</sup>.</li>
+</ul>
+<p>Operational advantage: the host application is trusted and has its own TCC permissions — <strong>dylib hijacking inherits the carrier's TCC context</strong> (injection into an application with FDA yields FDA). Drawback: the carrier application must be launched by the user. Detection: ESF <code>mmap</code>/<code>dyld</code> events + rules on loading libraries outside the application developer's signature <sup>[257]</sup> <sup>[273]</sup>.</p>
+<h3 id="65-other-platform-specific-evasions">6.5 Other platform-specific evasions</h3>
+<ul>
+<li><strong>Plist-only malware</strong>: persistence without a binary (script in a plist) — hard for file scanners <sup>[239]</sup>.</li>
+<li><strong>Legit signed binaries as proxies</strong>: <code>osascript</code>, <code>curl</code>, <code>python3</code>, <code>swift</code> — the entire LOOBins category (living off the orchard binaries) catalogs these cases with ATT&amp;CK references <sup>[306]</sup> <sup>[312]</sup>.</li>
+<li><strong>Log tampering</strong>: the Unified Log is well protected (SIP), but selective clearing with <code>log erase</code> requires root and is itself a loud event.</li>
+</ul>
+<hr />
+<h2 id="7-credential-access-the-keychain-as-a-vault">7. Credential access: the Keychain as a vault</h2>
+<p>The Keychain (login.keychain-db, iCloud Keychain) is the equivalent of the LSASS + Credential Manager combination: website passwords, tokens, certificates, private keys, Wi-Fi passwords. On top of that come browser cookies (sessions = MFA bypass) and SSH/cloud keys.</p>
+<h3 id="71-three-approaches-to-the-keychain">7.1 Three approaches to the Keychain</h3>
+<ol>
+<li><strong>the <code>security</code> CLI</strong> — <code>security find-generic-password -w</code>, <code>dump-keychain</code>. Requires unlocking the keychain (a prompt with the user's password — hence prompt phishing via osascript: <code>display dialog ... with hidden answer</code>). Loud, but native <sup>[264]</sup> <sup>[315]</sup>.</li>
+<li><strong>the SecItemCopyMatching API</strong> — programmatic reading via the Security framework; used by stealers for quiet harvesting without the CLI <sup>[264]</sup>.</li>
+<li><strong>Offline parse</strong> — dumping the <code>login.keychain-db</code> file and decrypting it offline with tools like <strong>chainbreaker</strong> (requires the user's password or key) <sup>[244]</sup>. <strong>LockSmith</strong> from SpecterOps automates the extraction of keys and secrets in post-exploitation scenarios <sup>[250]</sup>.</li>
+</ol>
+<h3 id="72-pitfalls-and-nuances">7.2 Pitfalls and nuances</h3>
+<ul>
+<li><strong>Keychain ACLs</strong>: entries have per-application access control lists. The analysis of CVE-2025-31191 (Microsoft) showed that the Security-Scoped Bookmarks mechanism allowed reading keychain ACLs from the sandbox — i.e., reconnoitering <em>what there is to take</em> without raising alarms <sup>[298]</sup> <sup>[300]</sup>.</li>
+<li><strong>Data Protection Keychain (iOS-style) on Apple Silicon</strong> and the Secure Enclave: hardware keys never leave the enclave — operations are performed on them, not theft. The red team therefore targets the <em>classic</em> login.keychain-db and application files.</li>
+<li><strong>Browser cookies</strong>: Safari protects cookies via TCC/SIP; Chrome/Edge/Firefox keep them in profiles under <code>~/Library/Application Support</code> — accessible with FDA. Stealers (AMOS/Poseidon/Odyssey) steal them en masse along with the keychain and crypto wallets <sup>[252]</sup> <sup>[255]</sup>.</li>
+<li><strong>SSH and cloud</strong>: <code>~/.ssh</code>, <code>~/.aws/credentials</code>, <code>~/.config/gcloud</code>, tokens in <code>~/.kube</code> — the standard SwiftBelt list <sup>[289]</sup>.</li>
+</ul>
+<h3 id="73-scenario-authorized-lab">7.3 Scenario (authorized lab)</h3>
+<ol>
+<li>Enumeration: <code>security list-keychains</code>, FDA check.</li>
+<li>Password prompt phishing (osascript dialog) → unlocking the keychain.</li>
+<li>Exfiltration: <code>security dump-keychain -d</code> to a temporary file, or SecItemCopyMatching in the agent's memory.</li>
+<li>Validation: using a stolen browser session token to log into a corporate SaaS application (MFA bypass via session).</li>
+<li>Detection (blue team): rules on <code>security</code> from an unusual parent, reads of <code>login.keychain-db</code> by a process without the entitlement, ESF file-open on the keychain <sup>[273]</sup> <sup>[269]</sup>.</li>
+</ol>
+<hr />
+<h2 id="8-lateral-movement-ssh-ard-and-mdm-abuse">8. Lateral movement: SSH, ARD and MDM abuse</h2>
+<p>Mac fleets rarely form a dense web of mutual trust like an AD domain, so lateral movement is more "point-wise": stolen keys, enabled remote services, and — above all — management infrastructure.</p>
+<h3 id="81-ssh-the-most-common-real-path">8.1 SSH: the most common real path</h3>
+<p><code>Remote Login</code> (SSH) is often enabled for developers and admins. Stolen keys from <code>~/.ssh</code> plus <code>known_hosts</code> entries provide a ready-made map of targets. macOS technique catalogs list SSH keys alongside Apple Remote Events as primary lateral movement vectors <sup>[259]</sup> <sup>[260]</sup>. Offensive variant: appending your own key to the <code>authorized_keys</code> of a user with frequent sudo.</p>
+<h3 id="82-ard-and-remote-apple-events">8.2 ARD and Remote Apple Events</h3>
+<ul>
+<li><strong>Apple Remote Desktop (ARD)</strong> — if enabled (port 3283, 5900 VNC), it provides full screen viewing and control; found in educational and creative fleets <sup>[260]</sup>.</li>
+<li><strong>Remote Apple Events</strong> — remote AppleScript execution between Macs (a historic automation mechanism); requires authentication, but in environments with scattered admin scripts it is sometimes abused <sup>[260]</sup>.</li>
+</ul>
+<h3 id="83-mdmjamf-lateral-movement-corporate-edition">8.3 MDM/Jamf: lateral movement, corporate edition</h3>
+<p>This is the most macOS-specific part of the entire compendium. MDM infrastructure has root on every machine and a push channel — seizing it is <strong>lateral movement at scale</strong>:</p>
+<ol>
+<li><strong>Agent secrets</strong>: the <code>jamf</code> binary and its keychain entries (e.g., a stored Jamf service-account password) are sometimes extracted from the local keychain — the encrypted Jamf password can be recovered, because the agent itself must decrypt it <sup>[294]</sup>.</li>
+<li><strong>JamfSniper / dedicated tools</strong>: proof-of-concepts demonstrating enumeration and attacks on the Jamf Pro API from stolen credentials <sup>[294]</sup>.</li>
+<li><strong>Orthrus</strong> — a research framework for MDM abuse: pushing profiles and packages to the fleet through a seized MDM API <sup>[294]</sup>.</li>
+<li><strong>Profiles as payload</strong>: a configuration profile can install CA certificates (SSL interception!), Wi-Fi/VPN payloads, and — via MDM — pkg packages; this is simultaneously persistence and lateral movement <sup>[294]</sup>.</li>
+</ol>
+<p>EDR comparisons and industry reports identify RMM/MDM abuse as a growing, insufficiently monitored vector on macOS <sup>[311]</sup> <sup>[304]</sup>.</p>
+<h3 id="84-decision-table">8.4 Decision table</h3>
+<table>
+<thead>
+<tr>
+<th>Situation in the environment</th>
+<th>Preferred path</th>
+<th>Stealth</th>
+<th>Scale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Developers, SSH enabled</td>
+<td>stolen SSH keys</td>
+<td>high (legitimate protocol)</td>
+<td>individual hosts</td>
+</tr>
+<tr>
+<td>Fleet under Jamf/Kandji</td>
+<td>MDM API takeover → pkg/profiles</td>
+<td>very high relative to EDR (traffic looks like administration)</td>
+<td>entire fleet</td>
+</tr>
+<tr>
+<td>ARD enabled (education/creative)</td>
+<td>ARD screen/control</td>
+<td>medium</td>
+<td>segments</td>
+</tr>
+<tr>
+<td>No remote services</td>
+<td>internal phishing + ClickFix</td>
+<td>low–medium</td>
+<td>individual hosts</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-command-and-control-mythic-poseidon-sliver-mdm-as-c2">9. Command and Control: Mythic, Poseidon, Sliver, MDM-as-C2</h2>
+<h3 id="91-framework-landscape">9.1 Framework landscape</h3>
+<table>
+<thead>
+<tr>
+<th>Framework / agent</th>
+<th>Agent language</th>
+<th>C2 profile</th>
+<th>Strengths on macOS</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Mythic + Apfell</strong></td>
+<td>JXA (osascript)</td>
+<td>HTTP(S), distributed profiles</td>
+<td>full in-memory, ObjC bridge, huge command library</td>
+<td><sup>[267]</sup> <sup>[268]</sup></td>
+</tr>
+<tr>
+<td><strong>Mythic + Poseidon</strong></td>
+<td>Go</td>
+<td>HTTP(S), many Mythic profiles</td>
+<td>cross-platform, <code>jxa</code> in-memory, <code>libinject</code>, <code>persist_launchd</code>, <code>socks</code></td>
+<td><sup>[78]</sup> <sup>[84]</sup></td>
+</tr>
+<tr>
+<td><strong>Sliver</strong></td>
+<td>Go</td>
+<td>mTLS, HTTP(S), DNS, WireGuard</td>
+<td>mature C2, implant armory; macOS officially supported</td>
+<td><sup>[283]</sup></td>
+</tr>
+<tr>
+<td><strong>MacC2</strong></td>
+<td>Python/shell</td>
+<td>custom</td>
+<td>lightweight, educational</td>
+<td><sup>[266]</sup></td>
+</tr>
+<tr>
+<td><strong>MDM-as-C2</strong></td>
+<td>—</td>
+<td>Apple Push + MDM API</td>
+<td>"C2" through trusted infrastructure, zero implants</td>
+<td><sup>[294]</sup></td>
+</tr>
+</tbody>
+</table>
+<h3 id="92-mythicapfell-the-canon-of-macos-c2">9.2 Mythic/Apfell: the canon of macOS C2</h3>
+<p>Apfell (today part of Mythic) was the first widely used C2 designed exclusively for macOS. Philosophy: <strong>the agent is JXA</strong>, so it runs everywhere without installation, and the JavaScript↔ObjC bridge provides the full system API <sup>[267]</sup>. The Mythic documentation describes the development of JXA and its integration with the ObjC bridge for native calls <sup>[268]</sup> <sup>[271]</sup> <sup>[274]</sup>. Typical staging: an osascript one-liner downloads and executes a JXA payload in memory.</p>
+<h3 id="93-poseidon-mythic-agent-the-go-swiss-army-knife">9.3 Poseidon (Mythic agent): the Go Swiss Army knife</h3>
+<p>The Poseidon repository and documentation list, among others: <code>jxa</code> (in-memory JXA from the Go agent), <code>libinject</code> (dylib injection), <code>persist_launchd</code> (one-command persistence), <code>socks</code> (pivoting), download/upload, shell <sup>[78]</sup> <sup>[84]</sup>. For the red team this is a practical compromise: a Go binary (compiled for darwin/arm64) with a rich toolset and the ability to escape into JXA when it is necessary to vanish from disk.</p>
+<h3 id="94-sliver-and-the-open-source-scene">9.4 Sliver and the open-source scene</h3>
+<p>Sliver (Bishop Fox) supports macOS as an implant platform; reviews and red-team writeups document macOS operations using Sliver and related tools <sup>[283]</sup> <sup>[266]</sup>. MacC2 remains an educational curiosity showing a minimal C2 for darwin <sup>[266]</sup>.</p>
+<h3 id="95-darwinops-and-the-weaponization-pipeline">9.5 DarwinOps and the "weaponization pipeline"</h3>
+<p>Repositories like DarwinOps show the opposite pole: not a C2 framework, but the <strong>weaponization of existing techniques</strong> — scripts automating the creation of malicious pkgs, JXA payloads, and persistence in a single pipeline <sup>[236]</sup> <sup>[266]</sup>. In red team practice, such a pipeline shortens campaign preparation from days to hours.</p>
+<h3 id="96-c2-through-trusted-infrastructure">9.6 C2 through trusted infrastructure</h3>
+<p>The quietest C2 is the one that does not exist: commands pushed via an MDM profile, a script pushed by a "Jamf policy", or a task in an RMM tool already present in the fleet. Network traffic goes to <code>*.jamfcloud.com</code> / <code>apple.com</code> — beyond the detection budget of most SOCs <sup>[294]</sup> <sup>[311]</sup>.</p>
+<hr />
+<h2 id="10-actions-on-objectives-from-stealers-to-targeted-operations">10. Actions on objectives: from stealers to targeted operations</h2>
+<h3 id="101-exfiltration">10.1 Exfiltration</h3>
+<ul>
+<li><strong>Quiet channels</strong>: HTTPS to CDNs/fronts (domain fronting is sometimes used), DNS (Sliver), custom Mythic profiles.</li>
+<li><strong>Archiving</strong>: <code>ditto -c -k</code> (native ZIP), <code>tar</code> — data from the Keychain, cookies, <code>~/Documents</code>, crypto wallets; the canonical stealer set <sup>[252]</sup>.</li>
+<li><strong>Exfiltration via cloud services</strong>: rclone / iCloud/Drive APIs — traffic in legitimate domains.</li>
+</ul>
+<h3 id="102-stealers-as-actions-on-objective-as-a-service">10.2 Stealers as "actions on objective-as-a-service"</h3>
+<p>The MaaS ecosystem monetizes exactly this stage: AMOS (USD 1,000–3,000/mo.) and Poseidon collect the keychain, cookies, autofill data, wallets, and files in a single run, then sell the logs <sup>[255]</sup> <sup>[308]</sup>. In ATT&amp;CK terms this is TA0010/TA0009 automated to the limit — the lesson for the red team is that <strong>the demonstrative value of a macOS attack lies in data, not in ransomware</strong> (the Mac ransomware market is marginal; the business damage comes from session and data theft) <sup>[304]</sup>.</p>
+<h3 id="103-targeted-operations-apt">10.3 Targeted operations (APT)</h3>
+<p>The DPRK shows the full pattern: BeaverTail (downloader/reconnaissance), InvisibleFerret (Python RAT with keylogger and exfiltrator), staging via fake recruitment and ClickFix, target: crypto/fintech developers <sup>[279]</sup> <sup>[284]</sup>. Characteristics: patience (multi-stage social engineering), cross-platform payloads, avoiding the kernel — everything in user-space.</p>
+<h3 id="104-sabotage-and-hindering-forensics">10.4 Sabotage and hindering forensics</h3>
+<p>Removing artifacts: plists, caches, <code>log show</code>/<code>log erase</code> (root). Note — the Unified Log forces correlation; forcibly clearing logs is itself an anomaly detectable through ESF and timeline gaps <sup>[273]</sup>.</p>
+<hr />
+<h2 id="11-blue-team-counterpoint-telemetry-and-detections">11. Blue Team counterpoint: telemetry and detections</h2>
+<h3 id="111-macos-telemetry-sources">11.1 macOS telemetry sources</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>What it provides</th>
+<th>Access</th>
+<th>Key events for detection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Endpoint Security Framework (ESF)</strong></td>
+<td>real-time stream of system events</td>
+<td>entitlement (EDR)</td>
+<td>exec, fork, signal, mmap, file ops, mount, profiles, and since macOS 26.4 — socket events (bind/connect at the ESF level) <sup>[273]</sup> <sup>[270]</sup></td>
+</tr>
+<tr>
+<td><strong>Unified Log</strong></td>
+<td><code>log show</code>/<code>log stream</code>, process signatures, TCC decisions</td>
+<td>user/root</td>
+<td>TCC decisions, launchd launches, osascript</td>
+</tr>
+<tr>
+<td><strong>XProtect / XPR / Behavior Service</strong></td>
+<td>signatures + behavior + remediation</td>
+<td>built-in</td>
+<td>detections of known families, remediation actions <sup>[305]</sup> <sup>[307]</sup></td>
+</tr>
+<tr>
+<td><strong>osquery / OpenBSM (audit)</strong></td>
+<td>SQL tables over system state</td>
+<td>open source</td>
+<td>launchd, processes, logged-in users, yara</td>
+</tr>
+<tr>
+<td><strong>Network / application firewall</strong></td>
+<td>per-process egress</td>
+<td>LuLu, Little Snitch</td>
+<td>new processes establishing outbound connections</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Telemetry matrix" src="assets-rt-macos/mfig3-telemetria.png" /></p>
+<p><em>Fig. 3. Detection coverage matrix: offensive techniques × telemetry sources (0 = blind spot, 3 = full visibility). Sources: <sup>[269]</sup> <sup>[273]</sup> <sup>[305]</sup>.</em></p>
+<p>Conclusion from the matrix: the weakest coverage concerns <strong>MDM abuse</strong> (traffic looks like administration) and <strong>key TCC bypasses</strong> (permission decisions are logged but rarely alerted on). The best covered — launchd persistence and keychain dumps.</p>
+<h3 id="112-ready-made-rules-and-projects">11.2 Ready-made rules and projects</h3>
+<ul>
+<li><strong>Elastic Security</strong>: prebuilt rules for macOS — T1543.001/.004 (launch agents/daemons), DYLD_INSERT_LIBRARIES, suspicious dylib loads <sup>[245]</sup> <sup>[256]</sup> <sup>[257]</sup>.</li>
+<li><strong>SigmaHQ + coreSigma</strong>: a pipeline converting Sigma rules into queries for macOS (including hunting for osascript, curl-pipe, persistence) <sup>[269]</sup>.</li>
+<li><strong>BeforeCrypt</strong>: an overview of the BeaverTail family (DPRK) with TTPs and indicators of compromise <sup>[278]</sup>.</li>
+<li><strong>SecureMac</strong>: an analysis of XProtect/MRT updates and their real effectiveness against contemporary threats <sup>[313]</sup>.</li>
+<li><strong>Objective-See</strong>: a free toolkit — <strong>LuLu</strong> (outbound firewall), <strong>KnockKnock</strong> (persistence scanner), <strong>BlockBlock</strong> (alert on persistence installation), KextView, ReiKey — the de facto defensive baseline for Macs without EDR <sup>[281]</sup> <sup>[287]</sup> <sup>[282]</sup>.</li>
+</ul>
+<h3 id="113-click-by-click-detection-for-the-top-5-techniques">11.3 Click-by-click detection for the top-5 techniques</h3>
+<ol>
+<li><strong>ClickFix (Terminal ← curl|zsh)</strong>: alert on <code>exec</code> where the parent ∈ {Terminal, iTerm2} and the child = curl/wget with a pipe argument into an interpreter; correlation with the Unified Log (pasting into a terminal generates events) <sup>[279]</sup> <sup>[269]</sup>.</li>
+<li><strong>LaunchAgent persistence</strong>: FIM on <code>~/Library/LaunchAgents</code> + ESF file-create; rule on a plist with <code>RunAtLoad=true</code> created by a process that is not an installer/MDM <sup>[245]</sup>.</li>
+<li><strong>Dylib injection/hijack</strong>: ESF mmap on libraries outside application directories; rule on a hardened-runtime process loading an unsigned dylib <sup>[256]</sup> <sup>[257]</sup>.</li>
+<li><strong>Keychain dump</strong>: processes (≠ securityd/MDM) opening <code>login.keychain-db</code>; <code>security dump-keychain</code> invocations outside an admin session <sup>[264]</sup>.</li>
+<li><strong>MDM abuse</strong>: anomalies in the MDM API (new packages/profiles outside a change window), the <code>jamf</code> binary launched by a user, exfiltration of MDM secrets from the keychain <sup>[294]</sup> <sup>[311]</sup>.</li>
+</ol>
+<h3 id="114-a-trend-favoring-defenders">11.4 A trend favoring defenders</h3>
+<p>Apple is steadily expanding ESF (macOS 26.4 added socket bind events — previously a C2 blind spot) <sup>[270]</sup>, and XPR is turning XProtect from a passive scanner into an active "remediator" <sup>[305]</sup>. At the same time, macOS 27 will tighten TCC — both sides must update their playbooks with every major release <sup>[240]</sup>.</p>
+<hr />
+<h2 id="12-threat-landscape-20242026">12. Threat landscape 2024–2026</h2>
+<h3 id="121-stealers-the-industrialization-of-theft">12.1 Stealers: the industrialization of theft</h3>
+<p>Three families dominate the statistics:</p>
+<ul>
+<li><strong>AMOS (Atomic macOS Stealer)</strong> — sold on Telegram for USD 1,000–3,000/mo., with a panel, builder, and regular updates circumventing new macOS versions; steals the keychain, cookies, autofill, wallets, files <sup>[255]</sup> <sup>[252]</sup>.</li>
+<li><strong>Poseidon (OSX.Poseidon / Storm-0468)</strong> — at its peak around 70% of active macOS infections (2025), distributed through malvertising cloning downloads of popular applications <sup>[308]</sup> <sup>[252]</sup>.</li>
+<li><strong>Odyssey</strong> — the successor in the AMOS line, observed in ClickFix campaigns in parallel with AMOS <sup>[252]</sup>.</li>
+</ul>
+<p>A common TTP taxonomy of stealers: delivery (DMG/malvertising/ClickFix) → Gatekeeper bypass (instructions for the victim) → <code>osascript</code>/native APIs → keychain dump (password prompt) → grabbing cookies/wallets → HTTPS exfiltration to the panel <sup>[252]</sup>.</p>
+<h3 id="122-numbers-that-change-attitudes">12.2 Numbers that change attitudes</h3>
+<p><img alt="macOS threat trends" src="assets-rt-macos/mfig4-trendy.png" /></p>
+<p><em>Fig. 4. Two market signals: the explosion in the trojan share of detections (16.6% → 50.3%) and the fourfold growth in the number of macOS malware families. Sources: <sup>[304]</sup> <sup>[308]</sup> <sup>[253]</sup>.</em></p>
+<ul>
+<li><strong>+400%</strong> new macOS malware families (2023→2024) <sup>[253]</sup>.</li>
+<li><strong>Trojans: 16.6% → 50.3%</strong> of detections year over year; adware declining, clear professionalization <sup>[304]</sup>.</li>
+<li><strong>44% of Macs</strong> in the Jamf population encountered malicious traffic in 2025; <strong>PuAgent</strong> accounts for 16.41% of detections as the most common single family <sup>[304]</sup>.</li>
+<li>Independent analyses confirm the stealer trend persisted throughout 2025 <sup>[253]</sup>, government advisories on LOTL techniques underline the universality of these TTPs on macOS as well <sup>[314]</sup>, and the LOLBins/LOOBins category is the subject of separate reviews <sup>[312]</sup>.</li>
+</ul>
+<h3 id="123-state-sponsored-campaigns">12.3 State-sponsored campaigns</h3>
+<p><strong>DPRK (Contagious Interview / DeceptiveDevelopment)</strong>: fake recruiters → a "test assignment" → BeaverTail/InvisibleFerret → theft of wallet data and crypto infrastructure. The 2025 variant: ClickFix with a request to "fix the camera" during an interview <sup>[279]</sup> <sup>[284]</sup>. Lesson for the red team: the most effective APT emulations on macOS are emulations of the <strong>recruitment process and developer tooling</strong>, not exploits.</p>
+<h3 id="124-supply-chain">12.4 Supply chain</h3>
+<p>The year 2025 brought macOS links in supply-chain attacks: North Korean campaigns spread malicious packages in developer registries (including npm), harvesting secrets from developers' machines, including Macs <sup>[280]</sup> <sup>[279]</sup>. Operational conclusion: the developer Mac is a strategic target — signing keys, CI/CD tokens, SSH access to production.</p>
+<h3 id="125-what-will-change-in-2026">12.5 What will change in 2026+</h3>
+<ul>
+<li>macOS 27: granular TCC (SysAdminFiles, NFSHomeDirectory) — the old "Accessibility→FDA" tricks will die out, new chains will appear <sup>[240]</sup> <sup>[251]</sup>.</li>
+<li>ESF with socket events (26.4) closes the last major C2 blind spot — C2 will shift even more strongly into trusted domains and MDM <sup>[270]</sup>.</li>
+<li>Analysts expect further growth of living-off-the-land and ClickFix techniques <sup>[312]</sup>.</li>
+</ul>
+<hr />
+<h2 id="13-development-path-and-laboratory">13. Development path and laboratory</h2>
+<h3 id="131-courses-and-certifications">13.1 Courses and certifications</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Nature</th>
+<th>For whom</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SpecterOps — Adversary Tactics: Mac Tradecraft</strong></td>
+<td>commercial course, lab-intensive</td>
+<td>red team operators</td>
+<td><sup>[288]</sup> <sup>[285]</sup> <sup>[286]</sup></td>
+</tr>
+<tr>
+<td><strong>SO-CON 2025 — "Mac tradecraft" talk</strong></td>
+<td>conference talk (recordings/slides)</td>
+<td>everyone</td>
+<td><sup>[235]</sup></td>
+</tr>
+<tr>
+<td><strong>Objective by the Sea (OBTS)</strong></td>
+<td>100% Apple security conference</td>
+<td>both sides</td>
+<td><sup>[267]</sup></td>
+</tr>
+<tr>
+<td><strong>100 Days of Red Team — macOS series</strong></td>
+<td>free technical notes</td>
+<td>self-learners</td>
+<td><sup>[239]</sup></td>
+</tr>
+<tr>
+<td><strong>Mythic blog (JXA/ObjC deep dives)</strong></td>
+<td>technical articles by the creators</td>
+<td>C2 operators</td>
+<td><sup>[272]</sup> <sup>[268]</sup></td>
+</tr>
+<tr>
+<td><strong>LOOBins (loobins.io)</strong></td>
+<td>catalog of macOS LOTL binaries with ATT&amp;CK mapping</td>
+<td>red + blue</td>
+<td><sup>[306]</sup></td>
+</tr>
+</tbody>
+</table>
+<h3 id="132-laboratory-legal-your-own">13.2 Laboratory (legal, your own)</h3>
+<ol>
+<li><strong>Hardware/VM</strong>: an Apple Silicon Mac (UTM/VirtualBuddy) — a second instance as the "victim", a third as the MDM (Jamf Now free tier / MicroMDM open source).</li>
+<li><strong>Blue baseline</strong>: LuLu + KnockKnock + BlockBlock, osquery with macOS packs, Unified Log forwarded to a SIEM <sup>[281]</sup>.</li>
+<li><strong>Red baseline</strong>: Mythic (Apfell + Poseidon), Sliver, SwiftBelt, your own pkg-builder <sup>[267]</sup> <sup>[78]</sup> <sup>[289]</sup> <sup>[236]</sup>.</li>
+<li><strong>Training scenarios</strong>: (a) ClickFix → LaunchAgent → Keychain → egress; (b) pkg postinstall → LaunchDaemon → dylib hijack of a carrier with FDA; (c) MDM takeover → profiles → fleet. For each: build the detection before considering the scenario "passed".</li>
+</ol>
+<h3 id="133-how-to-read-cves-and-advisories-for-macos">13.3 How to read CVEs and advisories for macOS</h3>
+<p>First-choice sources: Apple Security Releases (list of CVEs per version), ZDI advisories (technical details, e.g., ZDI-25-305), Microsoft Security Blog (root-cause analyses, e.g., SSB), Objective-See (malware writeups) <sup>[292]</sup> <sup>[295]</sup> <sup>[300]</sup>. The rule: every Apple "security update" is a map of what <em>previously</em> worked — updating the red team playbook after a major release is not optional.</p>
+<hr />
+<h2 id="14-conclusion">14. Conclusion</h2>
+<p>macOS has matured into a full-fledged theater of red team operations — with its own frameworks (Mythic/Apfell/Poseidon), its own LOTL catalog (LOOBins), its own criminal economy (AMOS/Poseidon MaaS), and its own APT campaigns (DPRK). Three truths worth taking away:</p>
+<ol>
+<li><strong>Attacking a Mac is attacking the human and trust, not the kernel.</strong> ClickFix, malvertising, fake recruitment — these carry the payload; Gatekeeper and TCC are bypassed mainly through social engineering or context inheritance, rarely through exploitation <sup>[279]</sup> <sup>[308]</sup>.</li>
+<li><strong>The most valuable target is not root but TCC/FDA + Keychain + MDM.</strong> Whoever has FDA and MDM secrets has the fleet — without a single byte of shellcode in the kernel <sup>[251]</sup> <sup>[294]</sup>.</li>
+<li><strong>The blue team has the tools — it needs consumers.</strong> ESF, XPR, the Unified Log, Elastic/Sigma rules, and the free Objective-See toolkit cover most of the techniques described here; the red team's advantage today stems mainly from the fact that macOS telemetry in many organizations still lands in a void <sup>[273]</sup> <sup>[281]</sup> <sup>[304]</sup>.</li>
+</ol>
+<p>As in the previous parts of the series (Linux, Windows): the techniques are described at a depth sufficient for building detections and authorized emulations — and no deeper. The full force of this document should serve the side that signed the engagement.</p>
+<hr />
+<h2 id="references">References</h2>
+<p><sup>[78]</sup>: https://hacktricks.wiki/en/windows-hardening/mythic.html
+<sup>[84]</sup>: https://redsiege.com/blog/2023/06/introduction-to-mythic-c2/
+<sup>[226]</sup>: https://www.tarlogic.com/blog/macos-gatekeeper-evasion-initial-access/
+<sup>[227]</sup>: https://www.sentinelone.com/vulnerability-database/cve-2025-46291/
+<sup>[231]</sup>: https://www.jamf.com/blog/shlayer-malware-abusing-gatekeeper-bypass-on-macos/
+<sup>[232]</sup>: https://forums.macrumors.com/threads/macos-sequoia-makes-it-harder-to-override-gatekeeper-security.2433066/
+<sup>[235]</sup>: https://www.youtube.com/watch?v=t_L2bdbXkp0
+<sup>[236]</sup>: https://www.redfoxsec.com/blog/macos-red-teaming
+<sup>[237]</sup>: https://www.redfoxsec.com/blog/macos-security-privilege-escalation
+<sup>[239]</sup>: https://www.100daysofredteam.com/p/a-red-teamers-primer-to-establishing-persistence-on-macos
+<sup>[240]</sup>: https://wojciechregula.blog/tags/tcc/
+<sup>[243]</sup>: https://www.iru.com/blog/malware-bypass-tcc
+<sup>[244]</sup>: https://www.startupdefense.io/mitre-attack-techniques/t1555-001-keychain
+<sup>[245]</sup>: https://detection.fyi/elastic/detection-rules/macos/persistence_suspicious_launch_agent_or_launch_daemon/
+<sup>[246]</sup>: https://www.sentinelone.com/labs/bypassing-macos-tcc-user-privacy-protections-by-accident-and-design/
+<sup>[250]</sup>: https://hacktricks.wiki/en/macos-hardening/macos-red-teaming/macos-keychain.html
+<sup>[251]</sup>: https://blog.1nf1n1ty.team/hacktricks/macos-hardening/macos-security-and-privilege-escalation/macos-security-protections/macos-tcc
+<sup>[252]</sup>: https://redcanary.com/blog/threat-intelligence/atomic-odyssey-poseidon-stealers/
+<sup>[253]</sup>: https://falconfeeds.io/blogs/macos-stealer-threats-2024-2025-trends-tactics-defenses/
+<sup>[254]</sup>: https://zeyadazima.com/notes/osmrnotes/
+<sup>[255]</sup>: https://www.threatdown.com/blog/welcome-to-the-era-of-macos-stealers/
+<sup>[256]</sup>: https://www.elastic.co/guide/en/security/8.19/dylib-injection-via-process-environment-variables.html
+<sup>[257]</sup>: https://app.tidalcyber.com/references/e5f59848-7014-487d-9bae-bed81af1b72b
+<sup>[258]</sup>: https://www.cyberark.com/resources/threat-research-blog/a-deep-dive-into-penetration-testing-of-macos-applications-part-3
+<sup>[259]</sup>: https://attack.mitre.org/techniques/T1021/
+<sup>[260]</sup>: https://unit42.paloaltonetworks.com/unique-popular-techniques-lateral-movement-macos/
+<sup>[261]</sup>: https://theevilbit.github.io/posts/dyld_insert_libraries_dylib_injection_in_macos_osx_deep_dive/
+<sup>[262]</sup>: https://fm-security.com/posts/dylib/
+<sup>[264]</sup>: https://www.esentire.com/blog/fake-deepseek-site-infects-mac-users-with-atomic-stealer
+<sup>[265]</sup>: https://hacktricks.wiki/en/macos-hardening/macos-security-and-privilege-escalation/macos-proces-abuse/macos-library-injection/macos-dyld-hijacking-and-dyld_insert_libraries.html
+<sup>[266]</sup>: https://blog.balliskit.com/setup-and-weaponize-mythic-c2-using-darwinops-to-target-macos-9c7d45a44d8b
+<sup>[267]</sup>: https://objectivebythesea.org/v2/talks/OBTS_v2_Thomas.pdf
+<sup>[268]</sup>: https://docs.specterops.io/mythic-agents/apfell-docs/home
+<sup>[269]</sup>: https://www.nebulock.io/blog/coresigma-developing-an-endpoint-security-framework-pipeline
+<sup>[270]</sup>: https://phorion.io/blog/reverse-engineering-macos-26.4s-undocumented-socket-bind-events/
+<sup>[271]</sup>: https://github.com/MythicAgents/apfell/blob/master/README.md
+<sup>[272]</sup>: https://specterops.io/blog/2020/08/13/a-change-of-mythic-proportions/
+<sup>[273]</sup>: https://malware.news/t/detection-engineering-using-apple-s-endpoint-security-framework/36646
+<sup>[274]</sup>: https://github.com/MythicAgents/apfell
+<sup>[278]</sup>: https://www.beforecrypt.com/en/beavertail-malware-threat-overview/
+<sup>[279]</sup>: https://thehackernews.com/2025/09/dprk-hackers-use-clickfix-to-deliver.html
+<sup>[280]</sup>: https://gitlab-com.gitlab.io/gl-security/security-tech-notes/threat-intelligence-tech-notes/north-korean-malware-sept-2025/
+<sup>[281]</sup>: https://objective-see.org/tools.html
+<sup>[282]</sup>: https://amerpie.lol/2025/05/30/blockblock-and-knockknock-from-objectivesee.html
+<sup>[283]</sup>: https://tldrsec.com/p/tldr-sec-208
+<sup>[284]</sup>: https://unit42.paloaltonetworks.com/north-korean-threat-actors-lure-tech-job-seekers-as-fake-recruiters/
+<sup>[285]</sup>: https://specterops.io/training/
+<sup>[286]</sup>: https://pentester.wtf/blog/2020/specterops-2020-review/
+<sup>[287]</sup>: https://objective-see.org/products/lulu.html
+<sup>[288]</sup>: https://informaconnect.com/adversary-tactics-identity-driven-offensive-tradecraft/
+<sup>[289]</sup>: https://github.com/cedowens/SwiftBelt
+<sup>[292]</sup>: https://daily.dev/posts/about-the-security-content-of-macos-tahoe-26-6-ypzwli29b
+<sup>[293]</sup>: https://www.sentinelone.com/vulnerability-database/cve-2025-43330/
+<sup>[294]</sup>: https://hacktricks.wiki/en/macos-hardening/macos-red-teaming/index.html
+<sup>[295]</sup>: https://www.sentinelone.com/vulnerability-database/cve-2026-28915/
+<sup>[296]</sup>: https://www.sentinelone.com/vulnerability-database/cve-2026-20658/
+<sup>[297]</sup>: https://www.iru.com/blog/crashone-cve-2025-24277-macos-sandbox-escape
+<sup>[298]</sup>: https://hackyboiz.github.io/2025/08/07/clalxk/MacOS_Sandbox_Escape_en/
+<sup>[300]</sup>: https://www.microsoft.com/en-us/security/blog/2025/05/01/analyzing-cve-2025-31191-a-macos-security-scoped-bookmarks-based-sandbox-escape/
+<sup>[301]</sup>: https://windowsforum.com/threads/critical-macos-security-flaw-cve-2025-31191-sandbox-escape-exploited-and-mitigated.364265/
+<sup>[302]</sup>: https://malware.news/t/analyzing-cve-2025-31191-a-macos-security-scoped-bookmarks-based-sandbox-escape/93819
+<sup>[303]</sup>: https://www.zerodayinitiative.com/advisories/ZDI-25-305/
+<sup>[304]</sup>: https://b2b-cyber-security.de/en/security-360-reports-2026-bedrohungslage-fuer-macos-und-mobile-endgeraete/
+<sup>[305]</sup>: https://www.trio.so/blog/xprotect-for-mac
+<sup>[306]</sup>: https://deepstrike.io/blog/what-is-living-off-the-land-binaries-lolbins
+<sup>[307]</sup>: https://www.youtube.com/watch?v=1pJWqtBxb50
+<sup>[308]</sup>: https://www.jamf.com/resources/white-papers/security-360-annual-trends-report/
+<sup>[311]</sup>: https://stabilise.io/blog/jamf-protect-vs-crowdstrike-vs-sentinelone-vs-sophos-edr-mac-comparison-2026
+<sup>[312]</sup>: https://www.emsisoft.com/en/blog/46383/exploring-lolbins-the-growing-threat-hiding-in-plain-sight/
+<sup>[313]</sup>: https://www.securemac.com/news/apple-is-updating-xprotect-and-mrt-is-it-enough
+<sup>[314]</sup>: https://www.cyber.gov.au/about-us/view-all-content/alerts-and-advisories/identifying-and-mitigating-living-off-the-land-techniques
+<sup>[315]</sup>: https://github.com/lutzenfried/Methodology/blob/main/13%20-%20MacOS%20intrusion.md</p>
+</main>
+<footer>
+  Red Team on macOS — an offensive and detection knowledge compendium &middot; as of August 2026
+</footer>
+</body>
+</html>
